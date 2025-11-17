@@ -3,26 +3,30 @@ import asyncio
 from collections import defaultdict
 from datetime import datetime, timedelta
 
-from telegram import Update
-from telegram.ext import Application, ContextTypes, CommandHandler, MessageHandler, filters
+from telegram import Update, BotCommand
+from telegram.ext import Application, ContextTypes, MessageHandler, CommandHandler, filters
+from telegram.constants import ParseMode
 from openai import AsyncOpenAI
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # === CONFIG ===
-TOKEN = os.getenv("BOT_TOKEN")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 PORT = int(os.getenv("PORT", 10000))
 
 client = AsyncOpenAI(api_key=OPENAI_KEY)
 
-# === MEMORY (5 messages) ===
+# === MEMORY & RATE LIMIT ===
 memory = defaultdict(list)
 rate = defaultdict(list)
 
 async def ai_reply(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str, chat_id: int):
     user_id = update.effective_user.id
     
-    # Rate limit 3/30s
+    # Rate limit
     now = datetime.now()
     rate[user_id] = [t for t in rate[user_id] if now - t < timedelta(seconds=30)]
     if len(rate[user_id]) >= 3:
@@ -30,7 +34,7 @@ async def ai_reply(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str
         return
     rate[user_id].append(now)
 
-    # Save user message
+    # Memory
     memory[chat_id].append({"role": "user", "content": text})
     if len(memory[chat_id]) > 10:
         memory[chat_id] = memory[chat_id][-10:]
@@ -87,8 +91,8 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if clean:
             await ai_reply(update, context, clean, chat.id)
 
-# === RUN ===
-app = Application.builder().token(TOKEN).build()
+# === APP ===
+app = Application.builder().token(BOT_TOKEN).build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("ask", ask))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
