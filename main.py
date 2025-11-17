@@ -41,43 +41,26 @@ async def ai_reply(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str
 
     msg = await update.message.reply_text("Thinking...")
 
-    try:
-        stream = await asyncio.wait_for(
+        try:
+        # Ask for full answer in ONE call – NO streaming edits
+        response = await asyncio.wait_for(
             client.chat.completions.create(
                 model="gpt-4o-mini",
-                messages=[{"role": "system", "content": "Be helpful and fast."}] + memory[chat_id][-5:],
-                stream=True,
+                messages=[{"role": "system", "content": "Answer fully but keep under 800 tokens."}] 
+                         + memory[chat_id][-5:],
                 temperature=0.7,
+                max_tokens=900
             ),
-            timeout=12
+            timeout=18
         )
-        answer = ""
-        async for chunk in stream:
-            if chunk.choices[0].delta.content:
-                answer += chunk.choices[0].delta.content
-                if len(answer) > 40:
-                    await msg.edit_text(answer + "...")
-        await msg.edit_text(answer)
+        answer = response.choices[0].message.content.strip()
+
+        # Send ONE clean message – no mid-edits = no cutoff
+        await msg.edit_text(answer or "No reply.")
         memory[chat_id].append({"role": "assistant", "content": answer})
-    except:
+
+    except Exception as e:
         await msg.edit_text("AI busy, try again.")
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "*SuccessMind AI*\n\n"
-        "• DM: full chat\n"
-        "• Group: @me or /ask\n"
-        "• Made in 🇪🇹 Ethiopia",
-        parse_mode="Markdown"
-    )
-
-async def ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if context.args:
-        await ai_reply(update, context, " ".join(context.args), update.effective_chat.id)
-
-async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text or ""
-    chat = update.effective_chat
 
     # DM
     if chat.type == "private" and text.strip():
