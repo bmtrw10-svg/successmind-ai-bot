@@ -1,13 +1,12 @@
 import os
 import asyncio
-from collections import defaultdict  # ← FIXED: ADD THIS
+from collections import defaultdict
 from datetime import datetime, timedelta
 
 from telegram import Update
-from telegram.ext import Application, ContextTypes, MessageHandler, CommandHandler, filters
+from telegram.ext import Application, ContextTypes, CommandHandler, MessageHandler, filters
 from openai import AsyncOpenAI
 
-# === CONFIG ===
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 OPENAI_KEY = os.environ.get("OPENAI_API_KEY")
 WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
@@ -15,7 +14,6 @@ PORT = int(os.environ.get("PORT", 10000))
 
 client = AsyncOpenAI(api_key=OPENAI_KEY)
 
-# === MEMORY & RATE LIMIT ===
 memory = defaultdict(list)
 rate = defaultdict(list)
 
@@ -28,6 +26,11 @@ async def ai_reply(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str
         return
     rate[user_id].append(now)
 
+    # Check for "who made you" (exact or similar)
+    if "who made you" in text.lower() or "who created you" in text.lower():
+        await update.message.reply_text("I was made by Engineer Biruk, an Ethiopian innovator.")
+        return
+
     memory[chat_id].append({"role": "user", "content": text})
     if len(memory[chat_id]) > 10:
         memory[chat_id] = memory[chat_id][-10:]
@@ -39,7 +42,7 @@ async def ai_reply(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str
             client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
-                    {"role": "system", "content": "Answer fully in 4-7 short bullet points. Never cut off."}
+                    {"role": "system", "content": "You are SuccessMind AI by Engineer Biruk — a motivational business man, chess master, athlete, and handsome leader like Alexander the Great. Give positive, inspiring vibes with Ethiopian pride. Short bullet points."}
                 ] + memory[chat_id][-5:],
                 temperature=0.7,
                 max_tokens=600
@@ -55,13 +58,11 @@ async def ai_reply(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "*SuccessMind AI*\n\n"
-        "• DM: Full chat support\n"
-        "• Group: Mention me (@NVAaichat_bot) or use /ask\n"
-        "• Made in Ethiopia\n\n"
-        "Welcome! I’m NovaAI — your intelligent assistant.\n"
-        "Ask me anything, and I’ll give you clear, fast, and helpful answers.\n\n"
-        "Start typing whenever you’re ready.",
+        "*SuccessMind AI by Engineer Biruk*\n\n"
+        "• DM: Full chat\n"
+        "• Group: Mention me or /ask\n"
+        "• Made in Ethiopia 🇪🇹 with pride\n\n"
+        "Welcome! I'm SuccessMind AI — your motivational guide to success. Ask me anything, and I'll inspire you like a business titan, chess master, athlete, and handsome leader. Let's conquer together!",
         parse_mode="Markdown"
     )
 
